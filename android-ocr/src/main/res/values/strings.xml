@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Text detection and recognition</string>
+    <string name="sd_card_missing">This application requires a SD Card</string>
+    <string name="detect_text">Detect Text</string>
+    <string name="recognize_text">Recognize Text</string>
+    <string name="back">Back</string>
+    <string name="alert">Alert</string>
+    <string name="error_creating_data_dir">An error occurred while creating data directory</string>
+    <string name="error_copying_assets">An error occurred while copying assets</string>
+</resources>
