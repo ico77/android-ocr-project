@@ -1,0 +1,10 @@
+<resources>
+    <string-array name="pref_camera_focus_mode_entries">
+        <item>Macro</item>
+        <item>Auto Focus</item>
+    </string-array>
+    <string-array name="pref_camera_focus_mode_values">
+        <item>macro</item>
+        <item>auto</item>
+    </string-array>
+</resources>

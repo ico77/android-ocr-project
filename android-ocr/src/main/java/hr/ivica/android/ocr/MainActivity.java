@@ -1,17 +1,18 @@
 package hr.ivica.android.ocr;
 
 import android.app.AlertDialog;
-import android.content.ContentValues;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -20,19 +21,12 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ViewFlipper;
 
-import hr.ivica.android.ocr.alerts.AlertDialogFactory;
-import hr.ivica.android.ocr.camera.CameraResource;
-import hr.ivica.android.ocr.graphics.MatTransform;
-import hr.ivica.android.ocr.ocr.Ocr;
-import hr.ivica.android.ocr.ocr.TesseractTrainingData;
-
 import com.googlecode.tesseract.android.TessBaseAPI;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
@@ -40,14 +34,14 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
-import hr.ivica.android.ocr.R;
+import hr.ivica.android.ocr.alerts.AlertDialogFactory;
+import hr.ivica.android.ocr.camera.CameraResource;
+import hr.ivica.android.ocr.graphics.MatTransform;
+import hr.ivica.android.ocr.ocr.Ocr;
+import hr.ivica.android.ocr.ocr.TesseractTrainingData;
 
 public final class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -80,7 +74,6 @@ public final class MainActivity extends AppCompatActivity {
     };
 
     static {
-        //System.loadLibrary("jpgt");
         System.loadLibrary("pngt");
         System.loadLibrary("lept");
         System.loadLibrary("tess");
@@ -91,6 +84,9 @@ public final class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
 
         if (!isSdCardMounted()) {
             Log.e(TAG, "External storage is not mounted");
@@ -145,6 +141,27 @@ public final class MainActivity extends AppCompatActivity {
         }
 
         mViewFlipper.showPrevious();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        Log.d(TAG, "onCreateOptionsMenu called");
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.menu_settings:
+                startActivity(new Intent(this, SettingsActivity.class));
+                return true;
+            case R.id.menu_about:
+                return false;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -247,7 +264,7 @@ public final class MainActivity extends AppCompatActivity {
             for (Rect rect : rects) {
                 Point p1 = new Point(rect.x, rect.y);
                 Point p2 = new Point(rect.x + rect.width, rect.y + rect.height);
-                Imgproc.rectangle(mat, p1, p2, new Scalar(255, 255, 255), 10);
+                Imgproc.rectangle(mat, p1, p2, new Scalar(255, 255, 255, 255), 10);
             }
         }
     }

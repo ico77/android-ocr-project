@@ -2,11 +2,14 @@ package hr.ivica.android.ocr.camera;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.hardware.Camera;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import hr.ivica.android.ocr.SettingsActivity;
 import hr.ivica.android.ocr.graphics.MatTransform;
 
 public class CameraResource implements SurfaceHolder.Callback {
@@ -56,8 +59,11 @@ public class CameraResource implements SurfaceHolder.Callback {
 
         setCameraDisplayOrientation();
 
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(mContext);
+        String focusModePref = sharedPref.getString(SettingsActivity.KEY_PREF_CAMERA_FOCUS_MODE, "");
+
         Camera.Parameters params = mCamera.getParameters();
-        params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
+        params.setFocusMode(focusModePref);
         mCamera.setParameters(params);
 
         // start previewFrame with new settings
