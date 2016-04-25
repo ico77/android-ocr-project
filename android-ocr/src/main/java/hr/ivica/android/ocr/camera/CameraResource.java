@@ -60,7 +60,7 @@ public class CameraResource implements SurfaceHolder.Callback {
         setCameraDisplayOrientation();
 
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(mContext);
-        String focusModePref = sharedPref.getString(SettingsActivity.KEY_PREF_CAMERA_FOCUS_MODE, "");
+        String focusModePref = sharedPref.getString(SettingsActivity.KEY_PREF_CAMERA_FOCUS_MODE, Camera.Parameters.FOCUS_MODE_MACRO);
 
         Camera.Parameters params = mCamera.getParameters();
         params.setFocusMode(focusModePref);
