@@ -43,7 +43,7 @@ import hr.ivica.android.ocr.graphics.MatTransform;
 import hr.ivica.android.ocr.ocr.Ocr;
 import hr.ivica.android.ocr.ocr.TesseractTrainingData;
 
-public final class MainActivity extends AppCompatActivity {
+public final class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "MainActivity";
     private static final String DEFAULT_LANGUAGE = "eng";
 
@@ -105,7 +105,7 @@ public final class MainActivity extends AppCompatActivity {
 
         mCameraResource = new CameraResource(this);
         mPreviewView = new SurfaceView(this);
-        mPreviewView.getHolder().addCallback(mCameraResource);
+        mPreviewView.getHolder().addCallback(this);
         mPreviewView.getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         mPreviewFrame = (FrameLayout) findViewById(R.id.camera_preview);
@@ -205,6 +205,38 @@ public final class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy called");
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        Log.d(TAG, "surfaceCreated");
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.d(TAG, "surfaceDestroyed");
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
+        Log.d(TAG, "surfaceChanged - format: " + format + " width: " + w + " height: " + h);
+        if (holder.getSurface() == null) {
+            // previewFrame surface does not exist
+            return;
+        }
+
+        mCameraResource.stopPreview();
+        mCameraResource.setCameraDisplayOrientation();
+        mCameraResource.setCameraParameters(w, h);
+
+        // start previewFrame with new settings
+        try {
+           mCameraResource.setPreviewDisplay(holder);
+           mCameraResource.startPreview();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting camera preview in surfaceChanged: " + e.getMessage(), e);
+        }
     }
 
     private String getBaseTessPath() {

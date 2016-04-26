@@ -9,12 +9,17 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import java.io.IOException;
+import java.util.List;
+
 import hr.ivica.android.ocr.SettingsActivity;
 import hr.ivica.android.ocr.graphics.MatTransform;
 
-public class CameraResource implements SurfaceHolder.Callback {
+public class CameraResource {
     private static final String TAG = "CameraResource";
     private static final int CAMERA_FACING_BACK_ID = 0;
+    private static final int MIN_PREVIEW_WIDTH = 600;
+    private static final int MIN_PREVIEW_HEIGHT = 400;
 
     private Camera mCamera;
     private MatTransform.RotateDegrees mCurrentRotation;
@@ -28,55 +33,11 @@ public class CameraResource implements SurfaceHolder.Callback {
         return mCurrentRotation;
     }
 
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        Log.d(TAG, "surfaceCreated");
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.d(TAG, "surfaceDestroyed");
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-        Log.d(TAG, "surfaceChanged " + Thread.currentThread().getName());
-        if (holder.getSurface() == null) {
-            // previewFrame surface does not exist
-            return;
-        }
-
+    public void setCameraDisplayOrientation() {
         if (mCamera == null) {
             throw new IllegalStateException("camera is null!");
         }
 
-        // stop previewFrame before making changes
-        try {
-            mCamera.stopPreview();
-        } catch (Exception e) {
-            // ignore: tried to stop a non-existent previewFrame
-        }
-
-        setCameraDisplayOrientation();
-
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(mContext);
-        String focusModePref = sharedPref.getString(SettingsActivity.KEY_PREF_CAMERA_FOCUS_MODE, Camera.Parameters.FOCUS_MODE_MACRO);
-
-        Camera.Parameters params = mCamera.getParameters();
-        params.setFocusMode(focusModePref);
-        mCamera.setParameters(params);
-
-        // start previewFrame with new settings
-        try {
-            mCamera.setPreviewDisplay(holder);
-            mCamera.startPreview();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting camera preview in surfaceChanged: " + e.getMessage(), e);
-        }
-    }
-
-    private void setCameraDisplayOrientation() {
         Camera.CameraInfo info = new Camera.CameraInfo();
         Camera.getCameraInfo(CAMERA_FACING_BACK_ID, info);
         int rotation = ((Activity)mContext).getWindowManager().getDefaultDisplay().getRotation();
@@ -105,7 +66,36 @@ public class CameraResource implements SurfaceHolder.Callback {
 
         mCurrentRotation = getRotationEnum(result);
         mCamera.setDisplayOrientation(result);
+    }
 
+    public void setCameraParameters(int w, int h) {
+        if (mCamera == null) {
+            throw new IllegalStateException("camera is null!");
+        }
+
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(mContext);
+        String focusModePref = sharedPref.getString(SettingsActivity.KEY_PREF_CAMERA_FOCUS_MODE, Camera.Parameters.FOCUS_MODE_MACRO);
+
+        Camera.Parameters params = mCamera.getParameters();
+        if (params.getSupportedFocusModes().contains(focusModePref)) {
+            params.setFocusMode(focusModePref);
+        } else {
+            Log.w(TAG, "Camera does not support " + focusModePref + " focus mode, using default focus");
+        }
+
+        Camera.Size size = getOptimalPreviewSize(w, h);
+        Log.d(TAG, "Camera optimal preview size is width: " + size.width + ", height: " + size.height );
+
+        params.setPreviewSize(size.width, size.height);
+        mCamera.setParameters(params);
+    }
+
+    public void setPreviewDisplay(SurfaceHolder holder) throws IOException {
+        if (mCamera == null) {
+            throw new IllegalStateException("camera is null!");
+        }
+
+        mCamera.setPreviewDisplay(holder);
     }
 
     private MatTransform.RotateDegrees getRotationEnum(int value) {
@@ -122,7 +112,7 @@ public class CameraResource implements SurfaceHolder.Callback {
      * A safe way to get an instance of the Camera object.
      */
     public void aquire() {
-        mCamera = Camera.open(0); // attempt to get a Camera instance
+        mCamera = Camera.open(0);
     }
 
     public void release() {
@@ -143,6 +133,19 @@ public class CameraResource implements SurfaceHolder.Callback {
         mCamera.startPreview();
     }
 
+    public void stopPreview() {
+        if (mCamera == null) {
+            throw new IllegalStateException("camera is null!");
+        }
+
+        try {
+            mCamera.stopPreview();
+        } catch (Exception e) {
+            Log.d(TAG, "stopPreview:" + e);
+        }
+
+    }
+
     public void autoFocus(Camera.AutoFocusCallback callback) {
         if (mCamera == null) {
             throw new IllegalStateException("camera is null!");
@@ -156,7 +159,33 @@ public class CameraResource implements SurfaceHolder.Callback {
             throw new IllegalStateException("camera is null!");
         }
 
-        // get an image from the camera
         mCamera.takePicture(null, null, callback);
+    }
+
+    private Camera.Size getOptimalPreviewSize(int w, int h) {
+        double targetRatio = (double) w / h;
+
+        Camera.Size optimalSize = null;
+        double minDiff = Double.MAX_VALUE;
+
+        List<Camera.Size> supportedPreviewSizes = mCamera.getParameters().getSupportedPreviewSizes();
+
+        for (Camera.Size size : supportedPreviewSizes) {
+            if (size.width < MIN_PREVIEW_WIDTH || size.height < MIN_PREVIEW_HEIGHT) {
+                continue;
+            }
+            double ratio = (double) size.width / size.height;
+            double ratioDiff = Math.abs(ratio - targetRatio);
+            if ( ratioDiff < minDiff) {
+                optimalSize = size;
+                minDiff = ratioDiff;
+            }
+        }
+
+        if (optimalSize == null) {
+            optimalSize = supportedPreviewSizes.get(0);
+        }
+        
+        return optimalSize;
     }
 }

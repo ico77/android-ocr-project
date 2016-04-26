@@ -57,6 +57,11 @@ public class MatTransform {
         return this;
     }
 
+    public MatTransform adaptiveThreshold() {
+        Imgproc.adaptiveThreshold(workingCopy, workingCopy, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY, 11, 2);
+        return this;
+    }
+
     public MatTransform gaussianBlur() {
         Mat clone = null;
         try {
