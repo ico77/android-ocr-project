@@ -42,6 +42,7 @@ import hr.ivica.android.ocr.camera.CameraResource;
 import hr.ivica.android.ocr.graphics.MatTransform;
 import hr.ivica.android.ocr.ocr.Ocr;
 import hr.ivica.android.ocr.ocr.TesseractTrainingData;
+import hr.ivica.android.ocr.util.Util;
 
 public final class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "MainActivity";
@@ -268,7 +269,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             BitmapFactory.Options options = new BitmapFactory.Options();
             Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, options);
             Bitmap bmpARGB = bmp.copy(Bitmap.Config.ARGB_8888, false);
-
+            Log.d(TAG, "picture taken - width: " + bmp.getWidth() + ", height: " + bmp.getHeight());
             bmp.recycle();
 
             Mat mat = new Mat();
@@ -282,12 +283,13 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
             List<Rect> textRegions = ocrEngine.detectText(matOriented);
             String recognizedText = ocrEngine.recognizeText(matOriented, textRegions, MainActivity.this);
-
             Log.w(TAG, "recognizedText is:" + recognizedText);
 
             addRectsToBitmap(textRegions, matOriented);
+
             Bitmap result = Bitmap.createBitmap(matOriented.width(), matOriented.height(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(matOriented, result);
+
             mImgPreview.setImageBitmap(result);
 
         }

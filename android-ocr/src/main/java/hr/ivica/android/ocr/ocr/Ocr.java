@@ -38,7 +38,7 @@ public class Ocr {
     private static final double MIN_EXTENT_VALUE = 0.2;
     private static final double MAX_EXTENT_VALUE = 0.9;
     private static final float DEFAULT_X_SCALE_FACTOR = 1.1f;
-    private static final float DEFAULT_Y_SCALE_FACTOR = 1.1f;
+    private static final float DEFAULT_Y_SCALE_FACTOR = 1.05f;
     private static final float OVERLAP_DETECTION_X_SCALE_FACTOR = 1.4f;
     private static final float OVERLAP_DETECTION_Y_SCALE_FACTOR = 1f;
     private static final Comparator<Rect> rectComparator = new Comparator<Rect>() {
@@ -233,27 +233,5 @@ public class Ocr {
         Rect rect = Imgproc.boundingRect(contour);
 
         return area/rect.area();
-    }
-
-    private void saveToMediaStore(Bitmap regionBmp, Activity activity) {
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.Images.Media.TITLE, "title");
-        values.put(MediaStore.Images.Media.BUCKET_ID, "test");
-        values.put(MediaStore.Images.Media.DESCRIPTION, "test Image taken");
-        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-        Uri uri = activity.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-        OutputStream outstream = null;
-        try {
-            outstream = activity.getContentResolver().openOutputStream(uri);
-            regionBmp.compress(Bitmap.CompressFormat.JPEG, 100, outstream);
-        } catch (IOException e) {
-            //
-        } finally {
-            try {
-                outstream.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 }
