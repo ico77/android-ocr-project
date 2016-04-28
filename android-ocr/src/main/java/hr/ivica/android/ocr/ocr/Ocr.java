@@ -32,6 +32,7 @@ import java.util.List;
 
 public class Ocr {
     private static final String TAG = "MatTransform";
+    private static final String DEFAULT_LANGUAGE = "eng";
     private static final int MIN_CONTOUR_PIXEL_WIDTH = 12;
     private static final int MIN_CONTOUR_PIXEL_HEIGHT = 12;
     private static final double MIN_SOLIDITY_VALUE = 0.25;
@@ -50,9 +51,28 @@ public class Ocr {
     };
 
     private TessBaseAPI baseApi;
+    private Object baseApiLock = new Object();
+    private BaseApiStatus baseApiStatus = BaseApiStatus.UNINITIALIZED;
 
     public Ocr(TessBaseAPI baseApi) {
         this.baseApi = baseApi;
+    }
+
+    public void init(String baseTessPath) throws OcrException {
+        synchronized (baseApiLock) {
+            if (!baseApi.init(baseTessPath, DEFAULT_LANGUAGE, 0)) {
+                throw new OcrException("Ocr initialization failed");
+            }
+
+            baseApiStatus = BaseApiStatus.READY;
+        }
+    }
+
+    public void end() {
+        synchronized (baseApiLock) {
+            baseApi.end();
+            baseApiStatus = BaseApiStatus.DESTROYED;
+        }
     }
 
     public List<Rect> detectText(Mat image) {
@@ -69,7 +89,7 @@ public class Ocr {
         }
     }
 
-    public String recognizeText(Mat image, List<Rect> textRegions, Activity activity) {
+    public String recognizeText(Mat image, List<Rect> textRegions) throws OcrException {
         StringBuilder recognizedText = new StringBuilder();
 
         for (Rect textRegion : textRegions) {
@@ -85,13 +105,16 @@ public class Ocr {
                 regionBmp = Bitmap.createBitmap(regionImage.width(), regionImage.height(), Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(regionImage, regionBmp);
 
-                baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK);
-                baseApi.setImage(regionBmp);
-                recognizedText.append(baseApi.getUTF8Text()).append(System.getProperty("line.separator"));
-                baseApi.clear();
-
-                saveToMediaStore(regionBmp, activity);
-            } finally {
+                synchronized (baseApiLock) {
+                    if (!(baseApiStatus == BaseApiStatus.READY)) {
+                        throw new OcrException("Ocr not ready");
+                    }
+                    baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK);
+                    baseApi.setImage(regionBmp);
+                    recognizedText.append(baseApi.getUTF8Text()).append(System.getProperty("line.separator"));
+                    baseApi.clear();
+                }
+             } finally {
                 if (regionImage != null) regionImage.release();
                 if (regionBmp != null) regionBmp.recycle();
             }
@@ -233,5 +256,11 @@ public class Ocr {
         Rect rect = Imgproc.boundingRect(contour);
 
         return area/rect.area();
+    }
+
+    private enum BaseApiStatus {
+        UNINITIALIZED,
+        READY,
+        DESTROYED
     }
 }

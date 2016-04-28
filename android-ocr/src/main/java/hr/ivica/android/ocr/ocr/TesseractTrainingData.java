@@ -21,41 +21,34 @@ public class TesseractTrainingData {
         this.assetManager = assetManager;
     }
 
-    public void copyTrainingDataToExternalStorage() throws IOException {
-        String mDestDir = getDataPath();
+    public String[] getTrainingDataFileList() throws IOException {
+        return assetManager.list(TESSDATA_DIR_NAME);
+    }
 
-        String[] files = null;
+    public void copyTrainingDataFile(String file, String destinationDir) throws IOException {
+        byte[] buffer = new byte[1024];
+
+        InputStream in = null;
+        OutputStream out = null;
+
+        File mDestFile = new File(destinationDir + File.separator + file);
+        if (mDestFile.exists()) return;
+
         try {
-            files = assetManager.list(TESSDATA_DIR_NAME);
-            for (String file : files) {
-                byte[] buffer = new byte[1024];
+            in = assetManager.open(TESSDATA_DIR_NAME + File.separator + file);
+            out = new FileOutputStream(mDestFile);
+            int length;
 
-                InputStream in = null;
-                OutputStream out = null;
-
-                File mDestFile = new File(mDestDir + File.separator + file);
-                if (mDestFile.exists()) continue;
-
-                try {
-                    in = assetManager.open(TESSDATA_DIR_NAME + File.separator + file);
-                    out = new FileOutputStream(mDestFile);
-                    int length;
-
-                    while ((length = in.read(buffer)) > 0) {
-                        out.write(buffer, 0, length);
-                    }
-                } finally {
-                    if (in != null) in.close();
-                    if (out != null) out.close();
-                }
+            while ((length = in.read(buffer)) > 0) {
+                out.write(buffer, 0, length);
             }
-        } catch (IOException e) {
-            Log.e(TAG, e.getMessage(), e);
-            throw e;
+        } finally {
+            if (in != null) in.close();
+            if (out != null) out.close();
         }
     }
 
-    private String getDataPath() throws IOException {
+    public String getExternalStorageDataPath() throws IOException {
         String mTessDataDirName = Environment.getExternalStorageDirectory()
                 + File.separator + TESSBASE_DIR_NAME
                 + File.separator + TESSDATA_DIR_NAME;
@@ -69,5 +62,10 @@ public class TesseractTrainingData {
         }
 
         return mTessDataDirName;
+    }
+
+    public String getBaseTessPath() {
+        return Environment.getExternalStorageDirectory()
+                + File.separator + TESSBASE_DIR_NAME;
     }
 }

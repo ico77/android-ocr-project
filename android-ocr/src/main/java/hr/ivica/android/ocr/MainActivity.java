@@ -1,11 +1,11 @@
 package hr.ivica.android.ocr;
 
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
@@ -34,29 +34,29 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 
-import hr.ivica.android.ocr.alerts.AlertDialogFactory;
 import hr.ivica.android.ocr.camera.CameraResource;
 import hr.ivica.android.ocr.graphics.MatTransform;
 import hr.ivica.android.ocr.ocr.Ocr;
+import hr.ivica.android.ocr.ocr.OcrEngineInitAsync;
+import hr.ivica.android.ocr.ocr.OcrException;
 import hr.ivica.android.ocr.ocr.TesseractTrainingData;
-import hr.ivica.android.ocr.util.Util;
+import hr.ivica.android.ocr.util.OnErrorCallback;
 
 public final class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "MainActivity";
-    private static final String DEFAULT_LANGUAGE = "eng";
 
     private FrameLayout mPreviewFrame;
     private SurfaceView mPreviewView;
     private CameraResource mCameraResource;
-    private AlertDialogFactory mAlertDialogFactory = new AlertDialogFactory();
     private ViewFlipper mViewFlipper;
     private ImageView mImgPreview;
 
-    private TessBaseAPI baseApi;
-    private Ocr ocrEngine;
+    private OcrEngineInitAsync mOcrEngineInitTask;
+    private List<AsyncTask> mStartedTasks = new LinkedList<>();
+    private Ocr mOcrEngine;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -91,17 +91,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
         if (!isSdCardMounted()) {
             Log.e(TAG, "External storage is not mounted");
-            AlertDialog alertDialog = mAlertDialogFactory.getAlertAndExitDialog(this, R.string.sd_card_missing);
-            alertDialog.show();
-        }
-
-        TesseractTrainingData trainingData = new TesseractTrainingData(getAssets());
-        try {
-            trainingData.copyTrainingDataToExternalStorage();
-        } catch (IOException e) {
-            Log.e(TAG, e.getMessage(), e);
-            AlertDialog alertDialog = mAlertDialogFactory.getAlertAndExitDialog(this, R.string.error_creating_data_dir);
-            alertDialog.show();
+            showAlert(R.string.sd_card_missing);
         }
 
         mCameraResource = new CameraResource(this);
@@ -170,9 +160,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         super.onStart();
         Log.d(TAG, "onStart called");
 
-        baseApi = new TessBaseAPI();
-        boolean success = baseApi.init(getBaseTessPath(), DEFAULT_LANGUAGE, 0);
-        ocrEngine = new Ocr(baseApi);
+        ocrEngineInitAsync();
     }
 
     @Override
@@ -199,7 +187,10 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         super.onStop();
         Log.d(TAG, "onStop called");
 
-        baseApi.end();
+        for (AsyncTask task : mStartedTasks) {
+            task.cancel(true);
+        }
+        mOcrEngine.end();
     }
 
     @Override
@@ -240,13 +231,30 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         }
     }
 
-    private String getBaseTessPath() {
-        return Environment.getExternalStorageDirectory()
-                + File.separator + TesseractTrainingData.TESSBASE_DIR_NAME;
+    private void showAlert(int msgResourceId) {
+        Intent intent = new Intent(this, AlertActivity.class);
+        intent.putExtra("alertText", getResources().getText(msgResourceId).toString());
+        startActivity(intent);
+        finish();
     }
 
     private boolean isSdCardMounted() {
         return Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
+    }
+
+    private void ocrEngineInitAsync() {
+        TesseractTrainingData trainingData = new TesseractTrainingData(getAssets());
+
+        OnErrorCallback onErrorCallback = new OnErrorCallback() {
+            @Override
+            public void execute(Throwable throwable) {
+                showAlert(R.string.error_init_ocr);
+            }
+        };
+
+        mOcrEngine = new Ocr(new TessBaseAPI());
+        mOcrEngineInitTask = new OcrEngineInitAsync(trainingData, mOcrEngine, onErrorCallback);
+        mOcrEngineInitTask.execute();
     }
 
     private class OcrAutoFocusCallback implements Camera.AutoFocusCallback {
@@ -281,8 +289,13 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
                     .rotate(mCameraResource.getCurrentRotation())
                     .getMat();
 
-            List<Rect> textRegions = ocrEngine.detectText(matOriented);
-            String recognizedText = ocrEngine.recognizeText(matOriented, textRegions, MainActivity.this);
+            List<Rect> textRegions = mOcrEngine.detectText(matOriented);
+            String recognizedText = null;
+            try {
+                recognizedText = mOcrEngine.recognizeText(matOriented, textRegions);
+            } catch (OcrException e) {
+                e.printStackTrace();
+            }
             Log.w(TAG, "recognizedText is:" + recognizedText);
 
             addRectsToBitmap(textRegions, matOriented);

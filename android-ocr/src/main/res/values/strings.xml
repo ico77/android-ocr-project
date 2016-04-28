@@ -1,14 +1,17 @@
 <resources>
     <string name="app_name">Text detection and recognition</string>
-    <string name="sd_card_missing">This application requires a SD Card</string>
+    <string name="sd_card_missing">This application requires an internal SD card</string>
     <string name="detect_text">Detect Text</string>
     <string name="recognize_text">Recognize Text</string>
     <string name="back">Back</string>
     <string name="alert">Alert</string>
     <string name="error_creating_data_dir">An error occurred while creating data directory</string>
     <string name="error_copying_assets">An error occurred while copying assets</string>
+    <string name="error_init_ocr">An error occurred while initializing ocr engine</string>
     <string name="menu_settings">Settings</string>
     <string name="menu_about">About</string>
     <string name="pref_camera_focus_mode">Camera Focus Mode</string>
     <string name="pref_camera_focus_mode_default">macro</string>
+    <string name="ok">OK</string>
+    <string name="text">text</string>
 </resources>
