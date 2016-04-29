@@ -5,6 +5,7 @@ import android.util.Log;
 
 import java.io.IOException;
 
+import hr.ivica.android.ocr.R;
 import hr.ivica.android.ocr.util.OnErrorCallback;
 
 public class OcrEngineInitAsync extends AsyncTask<Void, Void, Void> {
@@ -52,7 +53,7 @@ public class OcrEngineInitAsync extends AsyncTask<Void, Void, Void> {
     @Override
     protected void onPostExecute(Void result) {
         if (mThrowable != null) {
-            mOnErrorCallback.execute(mThrowable);
+            mOnErrorCallback.execute(mThrowable, R.string.error_init_ocr);
         }
     }
 }

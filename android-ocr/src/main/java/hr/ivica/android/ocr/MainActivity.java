@@ -33,20 +33,24 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 
 import hr.ivica.android.ocr.camera.CameraResource;
 import hr.ivica.android.ocr.graphics.MatTransform;
+import hr.ivica.android.ocr.ocr.DetectTextAsync;
 import hr.ivica.android.ocr.ocr.Ocr;
 import hr.ivica.android.ocr.ocr.OcrEngineInitAsync;
 import hr.ivica.android.ocr.ocr.OcrException;
 import hr.ivica.android.ocr.ocr.TesseractTrainingData;
 import hr.ivica.android.ocr.util.OnErrorCallback;
+import hr.ivica.android.ocr.util.OnSuccessCallback;
 
 public final class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
     private static final String TAG = "MainActivity";
+    private static final int CAMERA_PREVIEW_VIEW = 0;
+    private static final int DETECTED_TEXT_VIEW = 1;
+    private static final int RECOGNIZED_TEXT_VIEW = 2;
 
     private FrameLayout mPreviewFrame;
     private SurfaceView mPreviewView;
@@ -57,6 +61,15 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private OcrEngineInitAsync mOcrEngineInitTask;
     private List<AsyncTask> mStartedTasks = new LinkedList<>();
     private Ocr mOcrEngine;
+    private Mat mOcrImage;
+    private List<Rect> mTextRegions;
+    private OnSuccessCallback<List<Rect>> mDetectTextOnSuccessCallback = new DetectTextOnSuccessCallback();
+    private OnErrorCallback mOnErrorCallback = new OnErrorCallback() {
+        @Override
+        public void execute(Throwable throwable, int stringId) {
+            showAlertAndFinish(stringId);
+        }
+    };
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -91,7 +104,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
         if (!isSdCardMounted()) {
             Log.e(TAG, "External storage is not mounted");
-            showAlert(R.string.sd_card_missing);
+            showAlertAndFinish(R.string.sd_card_missing);
         }
 
         mCameraResource = new CameraResource(this);
@@ -102,14 +115,29 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         mPreviewFrame = (FrameLayout) findViewById(R.id.camera_preview);
         mImgPreview = (ImageView) findViewById(R.id.imgPreview);
 
-        // Add a listener to the Capture button
-        Button captureButton = (Button) findViewById(R.id.button_capture);
-        if (captureButton == null) throw new AssertionError("captureButton cannot be null");
+        Button detectTextButton = (Button) findViewById(R.id.button_detect_text);
 
-        captureButton.setOnClickListener(new View.OnClickListener() {
+        assert detectTextButton != null;
+        detectTextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 mCameraResource.autoFocus(new OcrAutoFocusCallback());
+            }
+        });
+
+        Button recognizeTextButton = (Button) findViewById(R.id.button_recognize_text);
+
+        assert recognizeTextButton != null;
+        recognizeTextButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+            String recognizedText = null;
+            try {
+                recognizedText = mOcrEngine.recognizeText(mOcrImage, mTextRegions);
+            } catch (OcrException e) {
+                e.printStackTrace();
+            }
+            Log.w(TAG, "recognizedText is:" + recognizedText);
             }
         });
 
@@ -118,12 +146,16 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
     @Override
     public void onBackPressed(){
-        if (mViewFlipper.getDisplayedChild() == 0) {
+        // exit the activity if the user presses the back button
+        // while the camera preview view is visible
+        if (mViewFlipper.getDisplayedChild() == CAMERA_PREVIEW_VIEW) {
             super.onBackPressed();
             return;
         }
 
-        if (mViewFlipper.getDisplayedChild() == 1) {
+        // go back to the camera preview if the user presses the
+        // back button while viewing the captured image
+        if (mViewFlipper.getDisplayedChild() == DETECTED_TEXT_VIEW) {
             mCameraResource.startPreview();
             BitmapDrawable drawable = (BitmapDrawable) mImgPreview.getDrawable();
             if (drawable != null) {
@@ -190,6 +222,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         for (AsyncTask task : mStartedTasks) {
             task.cancel(true);
         }
+        mOcrImage.release();
         mOcrEngine.end();
     }
 
@@ -225,13 +258,12 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         try {
            mCameraResource.setPreviewDisplay(holder);
            mCameraResource.startPreview();
-
         } catch (Exception e) {
             Log.e(TAG, "Error starting camera preview in surfaceChanged: " + e.getMessage(), e);
         }
     }
 
-    private void showAlert(int msgResourceId) {
+    private void showAlertAndFinish(int msgResourceId) {
         Intent intent = new Intent(this, AlertActivity.class);
         intent.putExtra("alertText", getResources().getText(msgResourceId).toString());
         startActivity(intent);
@@ -245,15 +277,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private void ocrEngineInitAsync() {
         TesseractTrainingData trainingData = new TesseractTrainingData(getAssets());
 
-        OnErrorCallback onErrorCallback = new OnErrorCallback() {
-            @Override
-            public void execute(Throwable throwable) {
-                showAlert(R.string.error_init_ocr);
-            }
-        };
-
         mOcrEngine = new Ocr(new TessBaseAPI());
-        mOcrEngineInitTask = new OcrEngineInitAsync(trainingData, mOcrEngine, onErrorCallback);
+        mOcrEngineInitTask = new OcrEngineInitAsync(trainingData, mOcrEngine, mOnErrorCallback);
         mOcrEngineInitTask.execute();
     }
 
@@ -272,46 +297,51 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
 
-            mViewFlipper.showNext();
-
             BitmapFactory.Options options = new BitmapFactory.Options();
-            Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length, options);
-            Bitmap bmpARGB = bmp.copy(Bitmap.Config.ARGB_8888, false);
-            Log.d(TAG, "picture taken - width: " + bmp.getWidth() + ", height: " + bmp.getHeight());
-            bmp.recycle();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-            Mat mat = new Mat();
-            Utils.bitmapToMat(bmpARGB, mat);
-
-            bmpARGB.recycle();
-
-            Mat matOriented = new MatTransform(mat)
-                    .rotate(mCameraResource.getCurrentRotation())
-                    .getMat();
-
-            List<Rect> textRegions = mOcrEngine.detectText(matOriented);
-            String recognizedText = null;
+            Bitmap bmp = null;
             try {
-                recognizedText = mOcrEngine.recognizeText(matOriented, textRegions);
-            } catch (OcrException e) {
-                e.printStackTrace();
+                bmp = BitmapFactory.decodeByteArray(data, 0, data.length, options);
+                Log.d(TAG, "picture taken - width: " + bmp.getWidth() + ", height: " + bmp.getHeight());
+
+                mOcrImage = new Mat();
+                Utils.bitmapToMat(bmp, mOcrImage);
+            } finally {
+                if (bmp != null) bmp.recycle();
             }
-            Log.w(TAG, "recognizedText is:" + recognizedText);
 
-            addRectsToBitmap(textRegions, matOriented);
+            new MatTransform(mOcrImage)
+                .rotate(mCameraResource.getCurrentRotation());
 
-            Bitmap result = Bitmap.createBitmap(matOriented.width(), matOriented.height(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(matOriented, result);
+            DetectTextAsync task = new DetectTextAsync(mOcrEngine, mDetectTextOnSuccessCallback, mOnErrorCallback);
+            task.execute(mOcrImage);
+            mStartedTasks.add(task);
+       }
+    }
 
-            mImgPreview.setImageBitmap(result);
+    private class DetectTextOnSuccessCallback implements OnSuccessCallback<List<Rect>> {
 
-        }
+        @Override
+        public void execute(List<Rect> rects) {
+            mTextRegions = rects;
+            Mat imageWithText = null;
 
-        private void addRectsToBitmap(List<Rect> rects, Mat mat) {
-            for (Rect rect : rects) {
-                Point p1 = new Point(rect.x, rect.y);
-                Point p2 = new Point(rect.x + rect.width, rect.y + rect.height);
-                Imgproc.rectangle(mat, p1, p2, new Scalar(255, 255, 255, 255), 10);
+            try {
+                imageWithText = mOcrImage.clone();
+
+                for (Rect rect : mTextRegions) {
+                    Point p1 = new Point(rect.x, rect.y);
+                    Point p2 = new Point(rect.x + rect.width, rect.y + rect.height);
+                    Imgproc.rectangle(imageWithText, p1, p2, new Scalar(255, 255, 255, 255), 10);
+                }
+
+                Bitmap result = Bitmap.createBitmap(imageWithText.width(), imageWithText.height(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(imageWithText, result);
+                mImgPreview.setImageBitmap(result);
+                mViewFlipper.setDisplayedChild(DETECTED_TEXT_VIEW);
+            } finally {
+                if (imageWithText != null) imageWithText.release();
             }
         }
     }

@@ -31,7 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Ocr {
-    private static final String TAG = "MatTransform";
+    private static final String TAG = "Ocr";
     private static final String DEFAULT_LANGUAGE = "eng";
     private static final int MIN_CONTOUR_PIXEL_WIDTH = 12;
     private static final int MIN_CONTOUR_PIXEL_HEIGHT = 12;
@@ -51,7 +51,7 @@ public class Ocr {
     };
 
     private TessBaseAPI baseApi;
-    private Object baseApiLock = new Object();
+    private final Object baseApiLock = new Object();
     private BaseApiStatus baseApiStatus = BaseApiStatus.UNINITIALIZED;
 
     public Ocr(TessBaseAPI baseApi) {
@@ -144,8 +144,8 @@ public class Ocr {
     }
 
     private List<Rect> getTextRegions(Mat image) {
-        List<Rect> rects = new ArrayList<Rect>();
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        List<Rect> rects = new ArrayList<>();
+        List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchy = new Mat();
 
         Mat cloned = null;

@@ -17,6 +17,12 @@
                 android:id="@+id/camera_preview"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
+            <Button
+                android:id="@+id/button_detect_text"
+                android:text="@string/detect_text"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_centerHorizontal="true"/>
         </RelativeLayout>
 
         <RelativeLayout
@@ -26,17 +32,16 @@
                 android:id="@+id/imgPreview"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
-
+            <Button
+                android:id="@+id/button_recognize_text"
+                android:text="@string/recognize_text"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_centerHorizontal="true"/>
         </RelativeLayout>
 
     </ViewFlipper>
 
-    <Button
-        android:id="@+id/button_capture"
-        android:text="@string/detect_text"
-        android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true">
-    </Button>
+
 
 </RelativeLayout>
