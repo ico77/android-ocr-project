@@ -1,5 +1,6 @@
 package hr.ivica.android.ocr;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -57,6 +58,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private CameraResource mCameraResource;
     private ViewFlipper mViewFlipper;
     private ImageView mImgPreview;
+    private ProgressDialog mCtrlActivityIndicator;
+    private Button mDetectTextButton;
 
     private OcrEngineInitAsync mOcrEngineInitTask;
     private List<AsyncTask> mStartedTasks = new LinkedList<>();
@@ -115,12 +118,13 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         mPreviewFrame = (FrameLayout) findViewById(R.id.camera_preview);
         mImgPreview = (ImageView) findViewById(R.id.imgPreview);
 
-        Button detectTextButton = (Button) findViewById(R.id.button_detect_text);
+        mDetectTextButton = (Button) findViewById(R.id.button_detect_text);
 
-        assert detectTextButton != null;
-        detectTextButton.setOnClickListener(new View.OnClickListener() {
+        assert mDetectTextButton != null;
+        mDetectTextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                mDetectTextButton.setEnabled(false);
                 mCameraResource.autoFocus(new OcrAutoFocusCallback());
             }
         });
@@ -142,6 +146,11 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         });
 
         mViewFlipper = (ViewFlipper) findViewById(R.id.ViewFlipper01);
+
+        mCtrlActivityIndicator = new ProgressDialog(MainActivity.this);
+        mCtrlActivityIndicator.setMessage(getString(R.string.progress_detect_text));
+        mCtrlActivityIndicator.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        mCtrlActivityIndicator.setIndeterminate(true);
     }
 
     @Override
@@ -156,6 +165,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         // go back to the camera preview if the user presses the
         // back button while viewing the captured image
         if (mViewFlipper.getDisplayedChild() == DETECTED_TEXT_VIEW) {
+            mDetectTextButton.setEnabled(true);
             mCameraResource.startPreview();
             BitmapDrawable drawable = (BitmapDrawable) mImgPreview.getDrawable();
             if (drawable != null) {
@@ -222,7 +232,10 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         for (AsyncTask task : mStartedTasks) {
             task.cancel(true);
         }
-        mOcrImage.release();
+
+        if (mOcrImage != null) {
+            mOcrImage.release();
+        };
         mOcrEngine.end();
     }
 
@@ -297,6 +310,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
 
+            mCtrlActivityIndicator.show();
+
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
@@ -338,6 +353,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
                 Bitmap result = Bitmap.createBitmap(imageWithText.width(), imageWithText.height(), Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(imageWithText, result);
+
+                mCtrlActivityIndicator.dismiss();
                 mImgPreview.setImageBitmap(result);
                 mViewFlipper.setDisplayedChild(DETECTED_TEXT_VIEW);
             } finally {

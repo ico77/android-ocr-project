@@ -15,4 +15,5 @@
     <string name="pref_camera_focus_mode_default">macro</string>
     <string name="ok">OK</string>
     <string name="text">text</string>
+    <string name="progress_detect_text">Detecting Text</string>
 </resources>
