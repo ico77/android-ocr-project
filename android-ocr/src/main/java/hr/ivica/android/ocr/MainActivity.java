@@ -17,6 +17,7 @@ import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -39,6 +40,7 @@ import java.util.List;
 
 import hr.ivica.android.ocr.camera.CameraResource;
 import hr.ivica.android.ocr.graphics.MatTransform;
+import hr.ivica.android.ocr.graphics.ScaleSize;
 import hr.ivica.android.ocr.ocr.DetectTextAsync;
 import hr.ivica.android.ocr.ocr.Ocr;
 import hr.ivica.android.ocr.ocr.OcrEngineInitAsync;
@@ -52,6 +54,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private static final int CAMERA_PREVIEW_VIEW = 0;
     private static final int DETECTED_TEXT_VIEW = 1;
     private static final int RECOGNIZED_TEXT_VIEW = 2;
+    private static final int MAX_CAPTURE_IMAGE_WIDTH = 2560;
+    private static final int MAX_CAPTURE_IMAGE_HEIGHT = 1920;
 
     private FrameLayout mPreviewFrame;
     private SurfaceView mPreviewView;
@@ -313,7 +317,14 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             mCtrlActivityIndicator.show();
 
             BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+            BitmapFactory.decodeByteArray(data, 0, data.length, options);
+            int inSampleSize = new ScaleSize().calculate(options.outWidth, options.outHeight, MAX_CAPTURE_IMAGE_WIDTH, MAX_CAPTURE_IMAGE_HEIGHT);
+
+            options.inJustDecodeBounds = false;
+            options.inSampleSize = inSampleSize;
 
             Bitmap bmp = null;
             try {

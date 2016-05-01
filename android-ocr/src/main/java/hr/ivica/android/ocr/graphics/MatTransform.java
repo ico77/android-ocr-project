@@ -96,6 +96,11 @@ public class MatTransform {
         return this;
     }
 
+    public MatTransform scaleDown(int witdthScaleFactor, int heightScaleFactor) {
+        Imgproc.pyrDown(workingCopy, workingCopy, new Size(witdthScaleFactor, heightScaleFactor));
+        return this;
+    }
+
     public Mat getMat() {
         return workingCopy;
     }
