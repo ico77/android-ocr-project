@@ -23,7 +23,31 @@ public class RectOperation {
             || firstRect.y + firstRect.height < secondRect.y);
     }
 
-    public void scale(Rect rect, float xScaleFactor, float yScaleFactor) {
+    public boolean isDominantOverlapOnYAxis(Rect firstRect, Rect secondRect, double overlapFactor) {
+        if (firstRect == null) {
+            throw new NullPointerException("Argument firstRect is null...");
+        }
+
+        if (secondRect == null) {
+            throw new NullPointerException("Argument secondRect is null...");
+        }
+
+        if (firstRect.y > secondRect.y + secondRect.height
+                || firstRect.y + firstRect.height < secondRect.y) {
+            return false;
+        }
+
+        int lowY = Math.min(firstRect.y, secondRect.y);
+        int highY = Math.max(firstRect.y + firstRect.height, secondRect.y + secondRect.height);
+
+        int combinedHeight = highY - lowY;
+        if (combinedHeight < overlapFactor * (firstRect.height + secondRect.height))
+            return true;
+        else
+            return false;
+    }
+
+    public void scale(Rect rect, double xScaleFactor, double yScaleFactor) {
         if (rect == null) {
             throw new NullPointerException("Argument firstRect is null...");
         }

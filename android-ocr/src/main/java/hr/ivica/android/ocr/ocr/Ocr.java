@@ -1,10 +1,6 @@
 package hr.ivica.android.ocr.ocr;
 
-import android.app.Activity;
-import android.content.ContentValues;
 import android.graphics.Bitmap;
-import android.net.Uri;
-import android.provider.MediaStore;
 import android.util.Log;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
@@ -21,10 +17,7 @@ import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -38,12 +31,23 @@ public class Ocr {
     private static final double MIN_SOLIDITY_VALUE = 0.25;
     private static final double MIN_EXTENT_VALUE = 0.2;
     private static final double MAX_EXTENT_VALUE = 0.9;
-    private static final float DEFAULT_X_SCALE_FACTOR = 1.1f;
-    private static final float DEFAULT_Y_SCALE_FACTOR = 1.05f;
-    private static final float OVERLAP_DETECTION_X_SCALE_FACTOR = 1.4f;
-    private static final float OVERLAP_DETECTION_Y_SCALE_FACTOR = 1f;
+    private static final double DEFAULT_X_SCALE_FACTOR = 1.1d;
+    private static final double DEFAULT_Y_SCALE_FACTOR = 1.1d;
+    private static final double OVERLAP_DETECTION_X_SCALE_FACTOR = 1.4d;
+    private static final double OVERLAP_DETECTION_Y_SCALE_FACTOR = 1d;
+    private static final double DEFAULT_OVERLAP_FACTOR = 0.9d;
+
     private static final Comparator<Rect> rectComparator = new Comparator<Rect>() {
         public int compare(Rect r1, Rect r2) {
+            RectOperation operation = new RectOperation();
+
+            // if the rectangles "dominantly" intersect in the y axis (meaning they are roughly on the same line),
+            // order them by their x coordinates
+            if (operation.isDominantOverlapOnYAxis(r1, r2, DEFAULT_OVERLAP_FACTOR)) {
+                if (r1.x < r2.x) return -1;
+                if (r1.x > r2.x) return 1;
+            }
+
             if (r1.y < r2.y) return -1;
             if (r1.y > r2.y) return 1;
             return 0;

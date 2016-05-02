@@ -4,6 +4,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 import hr.ivica.android.ocr.R;
 import hr.ivica.android.ocr.util.OnErrorCallback;
@@ -14,12 +15,12 @@ public class OcrEngineInitAsync extends AsyncTask<Void, Void, Void> {
     private TesseractTrainingData mTrainingData;
     private Ocr mOcrEngine;
     private Throwable mThrowable;
-    private OnErrorCallback mOnErrorCallback;
+    private WeakReference<OnErrorCallback> mOnErrorCallback;
 
     public OcrEngineInitAsync (TesseractTrainingData trainingData, Ocr ocrEngine, OnErrorCallback onErrorCallback) {
         this.mTrainingData = trainingData;
         this.mOcrEngine = ocrEngine;
-        this.mOnErrorCallback = onErrorCallback;
+        this.mOnErrorCallback = new WeakReference<>(onErrorCallback);
     }
 
     @Override
@@ -53,7 +54,11 @@ public class OcrEngineInitAsync extends AsyncTask<Void, Void, Void> {
     @Override
     protected void onPostExecute(Void result) {
         if (mThrowable != null) {
-            mOnErrorCallback.execute(mThrowable, R.string.error_init_ocr);
+            OnErrorCallback onErrorCallback = mOnErrorCallback.get();
+            if (onErrorCallback != null) {
+                onErrorCallback.execute(mThrowable, R.string.error_init_ocr);
+            }
+            return;
         }
     }
 }

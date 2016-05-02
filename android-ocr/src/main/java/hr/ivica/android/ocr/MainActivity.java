@@ -305,6 +305,8 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
         public void onAutoFocus(boolean success, Camera camera) {
             if (success) {
                 mCameraResource.takePicture(new OcrPictureCallback());
+            } else {
+                mDetectTextButton.setEnabled(true);
             }
         }
     }
