@@ -32,7 +32,7 @@ public class Ocr {
     private static final double MIN_EXTENT_VALUE = 0.2;
     private static final double MAX_EXTENT_VALUE = 0.9;
     private static final double DEFAULT_X_SCALE_FACTOR = 1.1d;
-    private static final double DEFAULT_Y_SCALE_FACTOR = 1.1d;
+    private static final double DEFAULT_Y_SCALE_FACTOR = 1.05d;
     private static final double OVERLAP_DETECTION_X_SCALE_FACTOR = 1.4d;
     private static final double OVERLAP_DETECTION_Y_SCALE_FACTOR = 1d;
     private static final double DEFAULT_OVERLAP_FACTOR = 0.9d;
@@ -56,6 +56,7 @@ public class Ocr {
 
     private TessBaseAPI baseApi;
     private final Object baseApiLock = new Object();
+    private final Object imageLock = new Object();
     private BaseApiStatus baseApiStatus = BaseApiStatus.UNINITIALIZED;
 
     public Ocr(TessBaseAPI baseApi) {
@@ -93,39 +94,46 @@ public class Ocr {
         }
     }
 
-    public String recognizeText(Mat image, List<Rect> textRegions) throws OcrException {
-        StringBuilder recognizedText = new StringBuilder();
+    public String recognizeText(Mat image, Rect textRegion) throws OcrException {
 
-        for (Rect textRegion : textRegions) {
-            Mat regionImage = null;
-            Bitmap regionBmp = null;
+        String recognizedText = null;
+        Mat regionImage = null;
+        Bitmap regionBmp = null;
 
-            try {
-                regionImage = new Mat(textRegion.height, textRegion.width, CvType.CV_8U);
+        try {
+            regionImage = new Mat(textRegion.height, textRegion.width, CvType.CV_8U);
 
+            synchronized (imageLock) {
                 image.submat(textRegion).copyTo(regionImage);
-                preprocessImageForRecognition(regionImage);
-
-                regionBmp = Bitmap.createBitmap(regionImage.width(), regionImage.height(), Bitmap.Config.ARGB_8888);
-                Utils.matToBitmap(regionImage, regionBmp);
-
-                synchronized (baseApiLock) {
-                    if (!(baseApiStatus == BaseApiStatus.READY)) {
-                        throw new OcrException("Ocr not ready");
-                    }
-                    baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK);
-                    baseApi.setImage(regionBmp);
-                    recognizedText.append(baseApi.getUTF8Text()).append(System.getProperty("line.separator"));
-                    baseApi.clear();
-                }
-             } finally {
-                if (regionImage != null) regionImage.release();
-                if (regionBmp != null) regionBmp.recycle();
             }
+            preprocessImageForRecognition(regionImage);
 
+            regionBmp = Bitmap.createBitmap(regionImage.width(), regionImage.height(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(regionImage, regionBmp);
+
+            synchronized (baseApiLock) {
+                if (!(baseApiStatus == BaseApiStatus.READY)) {
+                    throw new OcrException("Ocr not ready");
+                }
+                baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK);
+                baseApi.setImage(regionBmp);
+                recognizedText = baseApi.getUTF8Text();
+
+                int confidence = baseApi.meanConfidence();
+                if (confidence < 50) {
+                    Log.w(TAG, "Ignoring result: " + recognizedText
+                            + " because recognition confidence is below 50 percent: " + confidence);
+                }
+                Log.d(TAG, "Recognition confidence: " + confidence);
+                Log.d(TAG, "Recognized text: " + recognizedText);
+                baseApi.clear();
+            }
+        } finally {
+            if (regionImage != null) regionImage.release();
+            if (regionBmp != null) regionBmp.recycle();
         }
 
-        return recognizedText.toString();
+        return recognizedText;
     }
 
     private Mat preprocessImageForDetection(Mat image) {
@@ -169,7 +177,7 @@ public class Ocr {
         // filter contours
         while (contourIndex >= 0) {
             double[] data = hierarchy.get(0, contourIndex);
-            int nextContourIndex = (int)data[0];
+            int nextContourIndex = (int) data[0];
 
             MatOfPoint contour = contours.get(contourIndex);
             MatOfPoint2f contour2f = new MatOfPoint2f();
@@ -240,26 +248,25 @@ public class Ocr {
         Imgproc.convexHull(contour, cHullIndices);
 
         MatOfPoint mopOut = new MatOfPoint();
-        mopOut.create((int)cHullIndices.size().height,1,CvType.CV_32SC2);
+        mopOut.create((int) cHullIndices.size().height, 1, CvType.CV_32SC2);
 
-        for(int i = 0; i < cHullIndices.size().height ; i++)
-        {
-            int index = (int)cHullIndices.get(i, 0)[0];
-            double[] point = new double[] {
+        for (int i = 0; i < cHullIndices.size().height; i++) {
+            int index = (int) cHullIndices.get(i, 0)[0];
+            double[] point = new double[]{
                     contour.get(index, 0)[0], contour.get(index, 0)[1]
             };
             mopOut.put(i, 0, point);
         }
 
         double hullArea = Imgproc.contourArea(mopOut);
-        return area/hullArea;
+        return area / hullArea;
     }
 
     private double getContourExtent(MatOfPoint contour) {
         double area = Imgproc.contourArea(contour);
         Rect rect = Imgproc.boundingRect(contour);
 
-        return area/rect.area();
+        return area / rect.area();
     }
 
     private enum BaseApiStatus {

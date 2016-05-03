@@ -9,6 +9,7 @@
     <string name="error_copying_assets">An error occurred while copying assets</string>
     <string name="error_init_ocr">An error occurred while initializing ocr engine</string>
     <string name="error_detect_text">An error occurred while detecting text</string>
+    <string name="error_recognize_text">An error occurred while detecting text</string>
     <string name="menu_settings">Settings</string>
     <string name="menu_about">About</string>
     <string name="pref_camera_focus_mode">Camera Focus Mode</string>
@@ -16,4 +17,5 @@
     <string name="ok">OK</string>
     <string name="text">text</string>
     <string name="progress_detect_text">Detecting Text</string>
+    <string name="progress_recognize_text">RecognizingText</string>
 </resources>

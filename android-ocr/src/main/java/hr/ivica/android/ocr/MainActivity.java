@@ -1,26 +1,30 @@
 package hr.ivica.android.ocr;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.ClipboardManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.ViewFlipper;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
@@ -44,7 +48,7 @@ import hr.ivica.android.ocr.graphics.ScaleSize;
 import hr.ivica.android.ocr.ocr.DetectTextAsync;
 import hr.ivica.android.ocr.ocr.Ocr;
 import hr.ivica.android.ocr.ocr.OcrEngineInitAsync;
-import hr.ivica.android.ocr.ocr.OcrException;
+import hr.ivica.android.ocr.ocr.RecognizeTextAsync;
 import hr.ivica.android.ocr.ocr.TesseractTrainingData;
 import hr.ivica.android.ocr.util.OnErrorCallback;
 import hr.ivica.android.ocr.util.OnSuccessCallback;
@@ -64,6 +68,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private ImageView mImgPreview;
     private ProgressDialog mCtrlActivityIndicator;
     private Button mDetectTextButton;
+    private Button mRecognizeTextButton;
 
     private OcrEngineInitAsync mOcrEngineInitTask;
     private List<AsyncTask> mStartedTasks = new LinkedList<>();
@@ -71,6 +76,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
     private Mat mOcrImage;
     private List<Rect> mTextRegions;
     private OnSuccessCallback<List<Rect>> mDetectTextOnSuccessCallback = new DetectTextOnSuccessCallback();
+    private OnSuccessCallback<String> mRecognizeTextOnSuccessCallback = new RecognizeTextOnSuccessCallback();
     private OnErrorCallback mOnErrorCallback = new OnErrorCallback() {
         @Override
         public void execute(Throwable throwable, int stringId) {
@@ -133,26 +139,26 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             }
         });
 
-        Button recognizeTextButton = (Button) findViewById(R.id.button_recognize_text);
+        mRecognizeTextButton = (Button) findViewById(R.id.button_recognize_text);
 
-        assert recognizeTextButton != null;
-        recognizeTextButton.setOnClickListener(new View.OnClickListener() {
+        assert mRecognizeTextButton != null;
+        mRecognizeTextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-            String recognizedText = null;
-            try {
-                recognizedText = mOcrEngine.recognizeText(mOcrImage, mTextRegions);
-            } catch (OcrException e) {
-                e.printStackTrace();
-            }
-            Log.w(TAG, "recognizedText is:" + recognizedText);
+                mRecognizeTextButton.setEnabled(false);
+                mCtrlActivityIndicator.setMessage(getString(R.string.progress_recognize_text));
+                mCtrlActivityIndicator.show();
+
+                RecognizeTextAsync.Param params = new RecognizeTextAsync.Param(mTextRegions, mOcrImage);
+                RecognizeTextAsync task = new RecognizeTextAsync(mOcrEngine, mRecognizeTextOnSuccessCallback, mOnErrorCallback);
+                task.execute(params);
+                mStartedTasks.add(task);
             }
         });
 
         mViewFlipper = (ViewFlipper) findViewById(R.id.ViewFlipper01);
 
         mCtrlActivityIndicator = new ProgressDialog(MainActivity.this);
-        mCtrlActivityIndicator.setMessage(getString(R.string.progress_detect_text));
         mCtrlActivityIndicator.setProgressStyle(ProgressDialog.STYLE_SPINNER);
         mCtrlActivityIndicator.setIndeterminate(true);
     }
@@ -175,6 +181,10 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             if (drawable != null) {
                 drawable.getBitmap().recycle();
             }
+        }
+
+        if (mViewFlipper.getDisplayedChild() == RECOGNIZED_TEXT_VIEW) {
+            mRecognizeTextButton.setEnabled(true);
         }
 
         mViewFlipper.showPrevious();
@@ -315,7 +325,7 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
 
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
-
+            mCtrlActivityIndicator.setMessage(getString(R.string.progress_detect_text));
             mCtrlActivityIndicator.show();
 
             BitmapFactory.Options options = new BitmapFactory.Options();
@@ -373,6 +383,30 @@ public final class MainActivity extends AppCompatActivity implements SurfaceHold
             } finally {
                 if (imageWithText != null) imageWithText.release();
             }
+        }
+    }
+
+    private class RecognizeTextOnSuccessCallback implements OnSuccessCallback<String> {
+
+        @Override
+        public void execute(String result) {
+            mCtrlActivityIndicator.dismiss();
+
+            final TextView textView = (TextView) findViewById(R.id.recognized_text_view);
+            textView.setText(result);
+
+            if (Build.VERSION.SDK_INT < 11) {
+                textView.setClickable(true);
+                textView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        ClipboardManager cm = (ClipboardManager) MainActivity.this.getSystemService(Context.CLIPBOARD_SERVICE);
+                        cm.setText(textView.getText());
+                        Toast.makeText(MainActivity.this, "Copied to clipboard", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+            mViewFlipper.setDisplayedChild(RECOGNIZED_TEXT_VIEW);
         }
     }
 }
